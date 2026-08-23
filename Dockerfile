@@ -2,15 +2,13 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Установка зависимостей
+# Свежий pip лучше разруливает зависимости
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
 
-# Копирование кода
 COPY . .
 
-# Создание папки для данных
-RUN mkdir -p data
+RUN mkdir -p data logs
 
-# Запуск бота
 CMD ["python", "main.py"]
