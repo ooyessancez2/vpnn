@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  bot:
+    build: .
+    container_name: cyber_vpn_bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - cyber_net
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: cyber_vpn_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - cyber_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: cyber_vpn_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - cyber_net
+
+volumes:
+  pg_data:
+  redis_data:
+
+networks:
+  cyber_net:
+    driver: bridge
