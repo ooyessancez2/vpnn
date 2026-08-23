@@ -1,4 +1,5 @@
-from typing import List
+from typing import List, Union
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -7,7 +8,7 @@ class Settings(BaseSettings):
 
     # ===== TELEGRAM =====
     bot_token: str
-    admin_ids: List[int] = []
+    admin_ids: Union[List[int], int] = []
 
     # ===== REMNAWAVE =====
     remnawave_api_url: str = "https://panel.example.com"
@@ -32,10 +33,34 @@ class Settings(BaseSettings):
     # ===== REFERRAL =====
     referral_bonus_rub: int = 50
 
+    @field_validator("admin_ids", mode="before")
+    @classmethod
+    def normalize_admin_ids(cls, v):
+        """Принимает: число, список, строку, JSON-строку — приводит к списку int."""
+        if v is None or v == "" or v == []:
+            return []
+        # если уже список
+        if isinstance(v, list):
+            return [int(x) for x in v if str(x).strip()]
+        # если одно число
+        if isinstance(v, int):
+            return [v]
+        # если строка "123" или "123,456" или "[123, 456]"
+        if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                return []
+            # убираем скобки
+            v = v.strip("[]")
+            # разбиваем по запятым
+            parts = [p.strip() for p in v.split(",") if p.strip()]
+            return [int(p) for p in parts]
+        return []
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        extra="ignore",   # лишние переменные из .env (POSTGRES_* и т.д.) не ломают старт
+        extra="ignore",
     )
 
 
