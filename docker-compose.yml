@@ -1,44 +1,102 @@
-version: '3.8'
+# ============================================================
+# CYBER VPN BOT - DOCKER COMPOSE
+# Быстро. Технологично. Надежно.
+# ============================================================
 
 services:
+  # ===== БОТ (основной сервис) =====
   bot:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: cyber_vpn_bot
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///./data/bot.db
+      - TZ=Europe/Moscow
+    volumes:
+      - bot_data:/app/data
+      - bot_logs:/app/logs
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - cyber_net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+  # ===== БАЗА ДАННЫХ (PostgreSQL) =====
   postgres:
     image: postgres:15-alpine
     container_name: cyber_vpn_db
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-cyber_vpn_db}
+      POSTGRES_USER: ${POSTGRES_USER:-cyber_vpn_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_cyber_password_2026}
     volumes:
       - pg_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
     networks:
       - cyber_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cyber_vpn_user} -d ${POSTGRES_DB:-cyber_vpn_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
 
+  # ===== REDIS (кэш и состояние) =====
   redis:
     image: redis:7-alpine
     container_name: cyber_vpn_redis
     restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
+    ports:
+      - "127.0.0.1:6379:6379"
     networks:
       - cyber_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
 
+# ===== ТОМА (для сохранения данных) =====
 volumes:
+  bot_data:
+    driver: local
+  bot_logs:
+    driver: local
   pg_data:
+    driver: local
   redis_data:
+    driver: local
 
+# ===== СЕТЬ =====
 networks:
   cyber_net:
     driver: bridge
